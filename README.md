@@ -1,4 +1,4 @@
-  # vim-ctrlp-menu
+# vim-ctrlp-menu
 CtrlP Extension that allows adding custom menus of commands
 
 We usually have a bunch of useful commands, but don't want to create a mapping for each of them.. Instead of a host of key mappings and commands and remembering them all, wouldn't it be more useful to have a single mapping/command for all the other commands?
