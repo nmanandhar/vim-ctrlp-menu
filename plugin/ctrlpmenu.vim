@@ -7,6 +7,7 @@ function! s:ctrpMenu(menuid)
     call ctrlp#init(ctrlp#menu#id(a:menuid))
 endfunction
 
+
 function! s:menu_completion(argLead,cmdLine,cursorPos)
     if( a:argLead=="" )
         return insert(ctrlp#menu#names(),"ALL")
