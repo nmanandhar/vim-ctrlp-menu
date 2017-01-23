@@ -1,16 +1,18 @@
 " ==============================================================================
-" File:          autoload/ctrlp/menus.vim
+" File:          autoload/ctrlp/menu.vim
 " Description:   Create Your Own CtrlP Menu of Commands
 " Author:        Nirmal Manandhar (github.com/nmanandhar)
 " =============================================================================
-let g:loaded_ctrlp_menu=1
 let s:ctrlp_menuid_map={}
 let s:current_menu={} "Dictionary whose keys are currently displayed in the menu
 
-let g:ctrlp_use_default_menu = get(g:,'ctrlp_use_default_menu',1)
 let g:ctrlp_menus_filetypes = get(g:,'ctrlp_menus_filetypes',{})
 let s:bufferFiletype="" "Filetype of the buffer for the current menu
 
+let s:CTRLPMENU_SKIP_DEFAULTMENU= get(g:,'ctrlpmenu_skip_defaultmenu',0)
+let s:MENU_OF_MENU_ID = 'CTRLP_MENUOFMENU'
+let s:SHORTEND_LIST_MAX_LENGTH = 80
+let s:TAB = "\t"
 let s:DEFAULT_MENU_FILES={
             \   "copy current directory to clipboard" : 'let @+=getcwd()',
             \   "copy file path to clipboard"      : "let @+=expand('%:p')",
@@ -36,6 +38,20 @@ let s:DEFAULT_MENU_EMMET={
             \ "code pretty VISUAL MODE<C-Y>c" : "echom 'only works in visual mode. Use <C-y>c in visual mode to code pretty'"
             \ }
 
+function! ctrlp#menu#id(menu)
+    if(!has_key(s:ctrlp_menuid_map,a:menu))
+        call add( g:ctrlp_ext_vars, {
+                    \ 'init': 'ctrlp#menu#init("' . a:menu . '")',
+                    \ 'accept': 'ctrlp#menu#callback',
+                    \ 'lname': 'menu ' . a:menu,
+                    \ 'sname': a:menu,
+                    \ 'type': 'line', 
+                    \ 'sort': 0,
+                    \ })
+        let s:ctrlp_menuid_map[a:menu] = g:ctrlp_builtins + len(g:ctrlp_ext_vars)
+    endif
+    return s:ctrlp_menuid_map[a:menu]
+endfunction
 
 
 function! ctrlp#menu#init(menuId)
@@ -55,21 +71,23 @@ function! s:getMenuFor(menuId)
     endif
 endfunction
 
+
 function! s:getMenus()
     let menus= get(g:,'ctrlp_menus',{})
     if type(menus) != v:t_dict
         call s:log("Invalid setting. g:ctrlp_menus must be a map")
+        return {}
     endif
 
-    if(g:ctrlp_use_default_menu)
+    if(!s:CTRLPMENU_SKIP_DEFAULTMENU)
         if ! has_key(menus,'files')
             let menus.files = {}
         endif
-        call extend(menus.files,s:DEFAULT_MENU_FILES )
-
         if ! has_key(menus,'emmet')
             let menus.emmet={}
         endif
+        call extend(menus.files,s:DEFAULT_MENU_FILES )
+
         call extend(menus.emmet,s:DEFAULT_MENU_EMMET)
 
         "Associate emmet with html filetype
@@ -123,25 +141,68 @@ function! ctrlp#menu#callback(mode, selectedValue)
     endif
 endfunction
 
-function! ctrlp#menu#id(menu)
-    if(!has_key(s:ctrlp_menuid_map,a:menu))
-        call add( g:ctrlp_ext_vars, {
-                    \ 'init': 'ctrlp#menu#init("' . a:menu . '")',
-                    \ 'accept': 'ctrlp#menu#callback',
-                    \ 'lname': 'menu ' . a:menu,
-                    \ 'sname': a:menu,
-                    \ 'type': 'line', 
-                    \ 'sort': 0,
-                    \ })
-        let s:ctrlp_menuid_map[a:menu] = g:ctrlp_builtins + len(g:ctrlp_ext_vars)
-    endif
-    return s:ctrlp_menuid_map[a:menu]
-endfunction
-
 function! ctrlp#menu#setFiletype(type)
     let s:bufferFiletype = a:type
 endfunction
 
 function! s:log(str)
     echom a:str
+endfunction
+
+
+
+" ---------------------------------------------------------------
+"  Menu of Menu
+" ---------------------------------------------------------------
+function! ctrlp#menu#idMenuOfMenu()
+    if !has_key(s:ctrlp_menuid_map,s:MENU_OF_MENU_ID)
+        call add( g:ctrlp_ext_vars, {
+                    \ 'init': 'ctrlp#menu#init_menuOfMenu()',
+                    \ 'accept': 'ctrlp#menu#callback_menuOfMenu',
+                    \ 'lname': 'CtrlP Custom Menu',
+                    \ 'sname': 'CtrlP Menu',
+                    \ 'type': 'tabs',
+                    \ 'sort': 0,
+                    \ })
+        let s:ctrlp_menuid_map[s:MENU_OF_MENU_ID] = g:ctrlp_builtins + len(g:ctrlp_ext_vars)
+    endif
+    return s:ctrlp_menuid_map[s:MENU_OF_MENU_ID]
+endfunction
+
+
+function! ctrlp#menu#init_menuOfMenu()
+    let temp=[]
+    let menus = s:getMenus()
+    let menuIds = keys(menus)
+    for menuId in menuIds
+        if ! has_key(g:ctrlp_menus_filetypes, menuId)  " No filetype associated with this menu
+            call add(temp, s:pad(menuId,20) . s:TAB . s:listToShortedString(keys(menus[menuId])))
+        elseif s:bufferFiletype =~ g:ctrlp_menus_filetypes[menuId] " Check filetype before adding this menu
+            call add(temp, s:pad(menuId,20) . s:TAB . s:listToShortedString(keys(menus[menuId])))
+        endif
+    endfor
+    return temp
+endfunction
+
+
+function! s:listToShortedString(list)
+    let joinedString = join(a:list, " , ")
+    if(len(joinedString)> s:SHORTEND_LIST_MAX_LENGTH)
+        let joinedString = strpart(joinedString,0,s:SHORTEND_LIST_MAX_LENGTH - 1) . " ..."
+    endif
+    return "[ " . joinedString . " ]"
+endfunction
+
+function! ctrlp#menu#callback_menuOfMenu(mode, selectedValue)
+    let menuId =  s:removePadding(split(a:selectedValue, s:TAB)[0])
+    call ctrlp#exit()
+    call ctrlp#init(ctrlp#menu#id(menuId))
+endfunction
+
+function! s:pad(s,amt)
+    return a:s . repeat(' ',a:amt - len(a:s))
+endfunction
+
+function! s:removePadding(str)
+    return substitute(a:str,'\s\+$','','')
 endfunction
