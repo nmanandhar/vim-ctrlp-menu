@@ -17,12 +17,7 @@ command! -nargs=0 CtrlpMenuMenus call s:openMenuOfMenus()
 
 if ! exists("g:ctrlpmenu_skip_maps")
     try
-        nnoremap <unique> <c-m> :CtrlpMenuMenus<cr>
-    catch /mapping already exists.*/
-    endtry
-
-    try
-        nnoremap <unique> <leader>m :CtrlpMenu<cr>
+        nnoremap <unique> <leader>m :CtrlpMenuMenus<cr>
     catch /mapping already exists.*/
     endtry
 endif
